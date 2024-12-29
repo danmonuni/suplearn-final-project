@@ -1,0 +1,15 @@
+# data science 
+ numpy 
+ pandas
+ seaborn
+ matplotlib
+
+# torch
+ torch
+ torchvision
+ torchsummary
+
+
+# lightning
+ lightning 
+ torchmetrics
