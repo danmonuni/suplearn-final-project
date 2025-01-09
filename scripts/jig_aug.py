@@ -1,4 +1,4 @@
-#utilities
+
 import glob
 import sys
 import os
@@ -19,10 +19,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import sklearn
-
-#computer vision
-import cv2
-from memory_profiler import profile
 
 # torch
 import torch
@@ -63,7 +59,7 @@ class ImagesDataset(torch.utils.data.Dataset):
 
     def get_path(self,idx):
         return os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-    
+
 
 class MainDataModule(L.LightningDataModule):
     def __init__(self, data_urls: dict, transform = None, batch_size_train: int = 512):
@@ -97,7 +93,7 @@ class MainDataModule(L.LightningDataModule):
         os.rename("val_set", "test_set")
         os.rename("val_info.csv", "test_info.csv")
         os.rename("train_info.csv", "train_val_info.csv")
-        
+
         #Extract the validation set
         os.makedirs("val_set", exist_ok=True)
 
@@ -119,13 +115,16 @@ class MainDataModule(L.LightningDataModule):
         with open("val_info.csv", 'w') as f:
             f.writelines(val_annotations)
 
+
         val_image_names = [line.split(' ')[0] for line in val_annotations]
 
         for val_image in val_image_names:
             image_path = os.path.join("train_set", val_image)
-    
+
             if os.path.exists(image_path):
                 shutil.move(image_path, os.path.join("val_set", val_image))
+
+        os.remove("train_val_info.csv")
 
     def setup(self, stage: str = "train"):
 
@@ -143,7 +142,7 @@ class MainDataModule(L.LightningDataModule):
                 self.label_to_class[label] = class_name
 
 
-        self.train = pd.read_csv("train_info.csv", header = None).iloc[:, 1].values
+        self.train_labels = pd.read_csv("train_info.csv", header = None).iloc[:, 1].values
         self.val_labels = pd.read_csv("val_info.csv", header = None).iloc[:, 1].values
         self.test_labels = pd.read_csv("test_info.csv", header = None).iloc[:, 1].values
 
@@ -156,7 +155,7 @@ class MainDataModule(L.LightningDataModule):
 
     def test_dataloader(self):
         return torch.utils.data.DataLoader(self.test, batch_size = 1, shuffle = False)
-    
+
 
 def get_spaced_permutations( n_elements, n_permutations, overlap_tolerance, verbose = False):
 
@@ -187,46 +186,6 @@ def get_spaced_permutations( n_elements, n_permutations, overlap_tolerance, verb
 
 unfold = torch.nn.Unfold(kernel_size = (64,64), stride=64, padding=0)
 fold = torch.nn.Fold(output_size = (256,256), kernel_size = (64,64), stride=64, padding=0)
-
-def augment_single_permutation(permutation, x, unfold = unfold, fold = fold):
-    x_ = unfold(x)
-    x_ = x_[:, :, permutation]
-    x_ = fold(x_)
-    y_ = permutation.repeat(x.shape[0], 1)
-    return x_, y_
-
-def data_augmentation(batch, permutations):
-
-    x, y = batch
-
-    #start with the identity permutation
-    #the images remain the same, the labels become the identity permutation
-    x_augmented = x.clone()
-    y_augmented = torch.arange(permutations[0].shape[0]).repeat(x.shape[0],1)
-
-    results = []
-    with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        for perm in permutations:
-            future = executor.submit(augment_single_permutation, perm, x)
-            results.append(future)
-
-    for future in results:
-        x_, y_ = future.result()
-        x_augmented = torch.cat((x_augmented, x_), dim=0)
-        y_augmented = torch.cat((y_augmented, y_), dim=0)
-
-    return x_augmented, y_augmented
-    
-def save_image_and_annotation(image_tensor, label, save_folder, batch_idx, idx):
-    image_tensor = image_tensor.clamp(0, 1)
-    to_pil = transforms.ToPILImage()
-    pil_image = to_pil(image_tensor)
-
-    image_path = os.path.join(save_folder, f"img_{batch_idx}_{idx:04}.png")
-    pil_image.save(image_path)
-
-    # Return the annotation for the saved image
-    return (f"img_{batch_idx}_{idx:04}.png", label.tolist())
 
 data_urls = {
     "annotations": "https://food-x.s3.amazonaws.com/annot.tar",
@@ -264,44 +223,50 @@ save_folders = [
     'test_jigsaw'
 ]
 
+
+
+def data_augmentation(batch, permutations):
+
+    x, y = batch
+
+    #start with the identity permutation
+    #the images remain the same, the labels become the identity permutation
+    x_augmented = x.clone()
+    y_augmented = torch.arange(permutations[0].shape[0]).repeat(x.shape[0],1)
+
+    for permutation in permutations:
+        x_ = unfold(x)
+        x_ = x_[:, :, permutation]
+        x_ = fold(x_)
+        y_ = permutation.repeat(x.shape[0], 1)
+        x_augmented = torch.cat((x_augmented, x_), dim=0)
+        y_augmented = torch.cat((y_augmented, y_), dim=0)
+
+    return x_augmented, y_augmented
+
 permutations = get_spaced_permutations(16,16,1)
+to_pil = transforms.ToPILImage()
 
 for dataloader, save_folder in tqdm(zip(dataloaders,save_folders)):
 
     annotations = []
-    
 
     for batch_idx, batch in tqdm(enumerate(dataloader), total=len(dataloader)):
 
         x_augmented, y_augmented = data_augmentation(batch, permutations)
 
-        futures = []
+        for i in range(x_augmented.shape[0]):
+            image_tensor = x_augmented[i]
+            label = y_augmented[i]
 
-        with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
+            image_tensor = image_tensor.clamp(0, 1)
 
-            for i in range(x_augmented.shape[0]):
-                image_tensor = x_augmented[i]
-                label = y_augmented[i]
+            pil_image = to_pil(image_tensor)
 
-                future = executor.submit(save_image_and_annotation,
-                    image_tensor,
-                    label,
-                    save_folder,
-                    batch_idx,
-                    i
-                )
+            image_path = os.path.join(save_folder, f"img_{batch_idx}_{batch_idx:04}.png")
+            pil_image.save(image_path)
 
-                futures.append(future)
-        
-
-        #debugging
-        for name, obj in globals().items():
-            print(f"{name}: {sys.getsizeof(obj) / 1024:.2f} KB")
-
-        gc.collect()
-
-        for future in concurrent.futures.as_completed(futures):
-            annotations.append(future.result())
+            annotations.append((f"{save_folder}_{batch_idx}_{batch_idx:04}.png", label.tolist()))
 
     annotations_df = pd.DataFrame(annotations)
     annotations_df.to_csv(save_folder + "_info.csv", index=False, header=False)
