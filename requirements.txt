@@ -1,15 +1,29 @@
-# data science 
- numpy 
- pandas
- seaborn
- matplotlib
+#utilities
+glob
+os
+tqdm
+wandb
+joblib
+time
+PIL
+concurrent
+
+# data science
+numpy
+pandas
+seaborn
+matplotlib
+sklearn
+
+#computer vision
+cv2
 
 # torch
- torch
- torchvision
- torchsummary
+torch
+torchvision
+torchsummary
+torchmetrics
 
 
 # lightning
- lightning 
- torchmetrics
+lightning
