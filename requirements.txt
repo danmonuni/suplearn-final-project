@@ -1,22 +1,17 @@
-#utilities
-glob
-os
 tqdm
 wandb
 joblib
-time
-PIL
-concurrent
+Pillow
 
 # data science
 numpy
 pandas
 seaborn
 matplotlib
-sklearn
+scikit-learn
 
-#computer vision
-cv2
+# computer vision
+opencv-python
 
 # torch
 torch
@@ -24,6 +19,5 @@ torchvision
 torchsummary
 torchmetrics
 
-
 # lightning
-lightning
+pytorch-lightning
