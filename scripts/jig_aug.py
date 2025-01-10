@@ -33,6 +33,12 @@ import torchmetrics
 # lightning
 import lightning as L
 
+random.seed(42)
+np.random.seed(42)
+torch.manual_seed(42)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
 
 
 #default dataset code from pytorch documentation
@@ -72,11 +78,11 @@ class MainDataModule(L.LightningDataModule):
 
     def prepare_data(self):
         #download annotations
-        os.system(f"wget {self.data_urls['annotations']}")
+        os.system(f"curl -O {self.data_urls['annotations']}")
         #download training images
-        os.system(f"wget {self.data_urls['training_images']}")
+        os.system(f"curl -O {self.data_urls['training_images']}")
         #download validation images
-        os.system(f"wget {self.data_urls['validation_images']}")
+        os.system(f"curl -O {self.data_urls['validation_images']}")
 
         # Extract tar files
         os.system("tar -xf annot.tar")
@@ -148,7 +154,7 @@ class MainDataModule(L.LightningDataModule):
 
     #Dataloaders
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.train, batch_size = self.batch_size_train, shuffle=True)
+        return torch.utils.data.DataLoader(self.train, batch_size = self.batch_size_train, shuffle=False)
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(self.val, batch_size = 1, shuffle = False)
@@ -203,7 +209,7 @@ transform = transforms.Compose([
 
 my_data = MainDataModule(data_urls = data_urls, transform = transform, batch_size_train = 64)
 
-my_data.prepare_data()
+#my_data.prepare_data()
 
 my_data.setup()
 
@@ -245,6 +251,8 @@ def data_augmentation(batch, permutations):
     return x_augmented, y_augmented
 
 permutations = get_spaced_permutations(16,16,1)
+print(f"permutations: {permutations}")
+
 to_pil = transforms.ToPILImage()
 
 for dataloader, save_folder in tqdm(zip(dataloaders,save_folders)):
@@ -255,7 +263,11 @@ for dataloader, save_folder in tqdm(zip(dataloaders,save_folders)):
 
         x_augmented, y_augmented = data_augmentation(batch, permutations)
 
-        for i in range(x_augmented.shape[0]):
+        print(f"x_augmented.shape: {x_augmented.shape}")
+        print(f"y_augmented.shape: {y_augmented.shape}")
+
+        for i in tqdm(range(x_augmented.shape[0])):
+
             image_tensor = x_augmented[i]
             label = y_augmented[i]
 
@@ -263,10 +275,10 @@ for dataloader, save_folder in tqdm(zip(dataloaders,save_folders)):
 
             pil_image = to_pil(image_tensor)
 
-            image_path = os.path.join(save_folder, f"img_{batch_idx}_{batch_idx:04}.png")
+            image_path = os.path.join(save_folder, f"img_{batch_idx}_{i:04}.png")
             pil_image.save(image_path)
 
-            annotations.append((f"{save_folder}_{batch_idx}_{batch_idx:04}.png", label.tolist()))
+            annotations.append((f"{save_folder}_{batch_idx}_{i:04}.png", label.tolist()))
 
     annotations_df = pd.DataFrame(annotations)
     annotations_df.to_csv(save_folder + "_info.csv", index=False, header=False)

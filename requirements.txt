@@ -20,4 +20,4 @@ torchsummary
 torchmetrics
 
 # lightning
-pytorch-lightning
+lightning
