@@ -44,7 +44,7 @@ torch.backends.cudnn.benchmark = False
 #default dataset code from pytorch documentation
 class ImagesDataset(torch.utils.data.Dataset):
     def __init__(self, annotations_file: str = "./", img_dir: str = "./", transform = None, target_transform = None):
-        self.img_labels = pd.read_csv(annotations_file)
+        self.img_labels = pd.read_csv(annotations_file, header=None)
         self.img_dir = img_dir
         self.transform = transform
         self.target_transform = target_transform
@@ -209,7 +209,7 @@ transform = transforms.Compose([
 
 my_data = MainDataModule(data_urls = data_urls, transform = transform, batch_size_train = 64)
 
-#my_data.prepare_data()
+my_data.prepare_data()
 
 my_data.setup()
 
