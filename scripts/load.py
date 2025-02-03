@@ -7,4 +7,4 @@ test = np.load('data/bow_features/test_bow.npy')
 
 print(train.shape)
 print(val.shape)
-print(test)
+print(test.shape)
