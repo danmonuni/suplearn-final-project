@@ -1,2 +1,4 @@
 data/
 venv/
+.vscode/
+.DS_Store
